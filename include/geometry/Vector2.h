@@ -1,12 +1,18 @@
-#ifndef LINE_H
-#define LINE_H
+#ifndef VECTOR2_H
+#define VECTOR2_H
 
-#include "Point.h"
+#include "geometry/Point.h"
+
+#include <cmath>
 
 class Vector2 final {
 public:
-    Vector2(Point a, Point b): begin_(a), end_(b) {}
+    Vector2(Point a, Point b);
+
     float length() const;
+    bool  intersect(Vector2 other);
+
+
 private:
     Point begin_, end_;
 };

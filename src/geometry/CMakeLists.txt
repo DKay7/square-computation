@@ -1,4 +1,6 @@
 
-add_library(geometry Point.cpp Triangle.cpp)
+add_library(geometry 
+    Polygon.cpp Triangle.cpp Vector2.cpp
+)
 
-target_include_directories(geometry PUBLIC ${PROJECT_SOURCE_DIR}/../include)
+target_include_directories(geometry PUBLIC ${CMAKE_SOURCE_DIR}/include)
