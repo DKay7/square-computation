@@ -34,3 +34,11 @@ float Triangle::square() const {
 
     return square;
 }
+
+bool Triangle::is_point_inside(Point d) const {
+    // Check if point lays from the same side for all edges
+    auto o1 = Point::triple_orientation(d, a(), b()), o2 = Point::triple_orientation(d, b(), c()),
+         o3 = Point::triple_orientation(d, c(), a());
+    
+    return (o1 == o2) and (o2 == o3);
+}

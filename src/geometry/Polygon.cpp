@@ -5,7 +5,6 @@
 #include "geometry/Vector2.h"
 
 #include <initializer_list>
-#include <iterator>
 #include <stdexcept>
 #include <utility>
 
@@ -17,7 +16,7 @@ float Polygon::square() const {
     float sum = 0;
 
     for (int point_idx = 0; point_idx < points_.size(); ++point_idx) {
-        int next_point_idx = (point_idx + 1) % points_.size();
+        int next_point_idx = get_neighbour(point_idx, NeighbourDirection::COUNTER_CLOCKWISE).second;
         sum += points_[point_idx].x_ * points_[next_point_idx].y_ - points_[next_point_idx].x_ * points_[point_idx].y_;
     }
 
@@ -34,32 +33,48 @@ std::vector<Triangle> Polygon::triangulate() const {
 
     auto [convex_vertex, convex_vertex_idx] = find_convex_vertex();
 
-    auto intruding_vertex = find_intruding_vertex();
+    auto intruding_vertex_pair = find_intruding_vertex();
 
-    if (!intruding_vertex.has_value()) {
-        int left_neighbour_idx  = (convex_vertex_idx + 1) % points_.size();
-        int right_neighbour_idx = (convex_vertex_idx - 1 + points_.size()) % points_.size();
+    if (!intruding_vertex_pair.has_value()) {
+        // If no intruding vertex, just split by AB which connects convex vertex neighbours
 
-        auto [splitted_part, left_part] = split(left_neighbour_idx, right_neighbour_idx);
-        Triangle t {splitted_part};
-        triangles.push_back(t);
+        int clockwise_neighbour_idx         = get_neighbour(convex_vertex_idx, NeighbourDirection::CLOCKWISE).second;
+        int counter_clockwise_neighbour_idx = get_neighbour(convex_vertex_idx, NeighbourDirection::COUNTER_CLOCKWISE).second;
+
+        auto [splitted_part, left_part] = split(clockwise_neighbour_idx, counter_clockwise_neighbour_idx);
+        triangles.push_back(Triangle {splitted_part});
 
         auto left_triangles = left_part.triangulate();
         triangles.insert(triangles.end(), left_triangles.begin(), left_triangles.end());
     }
     else {
+        // If there's intruding vertex, split by CD where C is convex vertex and D is intruding vertex
+        auto [part_a, part_b] = split(intruding_vertex_pair->second, convex_vertex_idx);
+
+        auto part_a_triangles = part_a.triangulate();
+        triangles.insert(triangles.end(), part_a_triangles.begin(), part_a_triangles.end());
+
+        auto part_b_triangles = part_b.triangulate();
+        triangles.insert(triangles.end(), part_b_triangles.begin(), part_b_triangles.end());
     }
 
     return triangles;
 }
 
 std::pair<Polygon, Polygon> Polygon::split(int a_idx, int b_idx) const {
-    if (!is_chord(a_idx, b_idx))
+    if (!is_chord(a_idx, b_idx) or a_idx == b_idx)
         throw std::invalid_argument("Vector{a, b} must be a polygon chord to split it");
 
-    // TODO: split
-    //
-    return {{}, {}};
+    std::vector<Point> part_a, part_b;
+
+    for (int vertex_idx = 0; vertex_idx < points_.size(); ++vertex_idx) {
+        if (vertex_idx >= a_idx and vertex_idx <= b_idx)
+            part_b.push_back(points_[vertex_idx]);
+        else
+            part_a.push_back(points_[vertex_idx]);
+    }
+
+    return {{part_a}, {part_b}};
 }
 
 bool Polygon::is_chord(int a_idx, int b_idx) const {
@@ -79,6 +94,78 @@ bool Polygon::is_chord(int a_idx, int b_idx) const {
     return true;
 }
 
-std::optional<std::pair<const Point &, int>> Polygon::find_intruding_vertex() const { return {{points_[0], 0}}; }
+std::pair<const Point &, int> Polygon::get_neighbour(int idx, NeighbourDirection dir) const {
+    if (dir == NeighbourDirection::CLOCKWISE) {
+        int clockwice_neighbour_idx = (idx + 1) % points_.size();
+        return {points_[clockwice_neighbour_idx], clockwice_neighbour_idx};
+    }
 
-std::pair<const Point &, int> Polygon::find_convex_vertex() const { return {points_[0], 0}; }
+    int counter_clockwice_neighbour_idx = (idx - 1 + points_.size()) % points_.size();
+    return {points_[counter_clockwice_neighbour_idx], counter_clockwice_neighbour_idx};
+}
+
+std::pair<const Point &, int> Polygon::find_convex_vertex() const {
+    if (points_.size() < 3)
+        return {points_[0], 0};
+
+    for (int convex_candidate_idx = 0; convex_candidate_idx < points_.size(); ++convex_candidate_idx) {
+        auto clockwice_neighbour         = get_neighbour(convex_candidate_idx, NeighbourDirection::CLOCKWISE);
+        auto counter_clockwice_neighbour = get_neighbour(convex_candidate_idx, NeighbourDirection::COUNTER_CLOCKWISE);
+
+        auto orientation = Point::triple_orientation(counter_clockwice_neighbour.first, points_[convex_candidate_idx],
+                                                     clockwice_neighbour.first);
+
+        if (orientation == Point::OrientationType::CLOCKWISE)
+            return {points_[convex_candidate_idx], convex_candidate_idx};
+    }
+
+    // the only way we came up here is that all our points are laying on one line,
+    // so, just return any of them
+
+    return {points_[0], 0};
+}
+
+std::optional<std::pair<const Point &, int>> Polygon::find_intruding_vertex() const {
+    /*
+        The algorithm is simple. First, we find convex vertex (let it be B) and its neighbours:
+        counter-clockwice (let it be A) and clockwise (let it be C).
+
+        We define an intruding vertex as a vertex D which lays inside of the ABC triangle,
+        and the distance from D to AC is_chord maximum (if we have several possible intruding points,
+        we choose the one with maximum distance to CA).
+
+        So, to do that, we just iterate over poly and check if another vertice is inside of the ABC,
+        and if so, check its' distance to CA.
+    */
+
+    auto [convex_vertex, convex_vertex_idx]             = find_convex_vertex();
+    auto [clockwice_neighbour, clockwice_neighbour_idx] = get_neighbour(convex_vertex_idx, NeighbourDirection::CLOCKWISE);
+    auto [counter_clockwice_neighbour, counter_clockwice_neighbour_idx] =
+        get_neighbour(convex_vertex_idx, NeighbourDirection::COUNTER_CLOCKWISE);
+
+    Vector2              ca_edge(counter_clockwice_neighbour, clockwice_neighbour);
+    Triangle abc{counter_clockwice_neighbour, convex_vertex, clockwice_neighbour};
+
+    std::optional<std::pair<Point, int>> intrudind_candidate = std::nullopt;
+    float                max_distance        = -1;
+
+    // iterate throught whole polygon, but start from convex vertex clockwise neighbour
+    for (int vertex_idx = clockwice_neighbour_idx; vertex_idx != convex_vertex_idx;
+         vertex_idx     = get_neighbour(vertex_idx, NeighbourDirection::CLOCKWISE).second)
+    {
+        Point current_vertex = points_[vertex_idx];
+        
+        // if another vertex is not inside our triangle, just skip it
+        if (!abc.is_point_inside(current_vertex)) 
+            continue;
+        
+        // check distance
+        double distance_to_ca = ca_edge.distance_to(current_vertex);
+        if (distance_to_ca > max_distance) {
+            intrudind_candidate = {current_vertex, vertex_idx};
+            max_distance = distance_to_ca;
+        }
+    }
+
+    return intrudind_candidate;
+}

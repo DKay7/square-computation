@@ -15,9 +15,8 @@ public:
     const Point& a() const;
     const Point& b() const;
     const Point& c() const;
-
-    Triangle &operator=(Triangle& other) = default;
-    Triangle &operator=(const Triangle& other) = default;
+    
+    bool is_point_inside(Point d) const;
 };
 
 #endif  // !TRIANGLE_H
