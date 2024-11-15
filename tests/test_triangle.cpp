@@ -1,7 +1,7 @@
 #include "geometry/Point.h"
 #include "geometry/Triangle.h"
-#include <gtest/gtest.h>
 
+#include <gtest/gtest.h>
 #include <vector>
 
 TEST(Triangle, Ctor) {
@@ -12,6 +12,10 @@ TEST(Triangle, Ctor) {
     EXPECT_EQ(t1.get_points(), triangle_points);
 }
 
-TEST(Triangle, Square) {
-  EXPECT_TRUE(true);
-}
+TEST(Triangle, Square) { EXPECT_TRUE(true); }
+
+// TODO tests for:
+//  1. special cases (triangle is a line or point)
+//  2. dot product, cross product, intersection, triple_orientation etc.
+//  3. test square computation
+//  4. test that polygon square equals to the sum of its triangle squares after triangulation
