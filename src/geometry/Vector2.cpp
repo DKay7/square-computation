@@ -50,10 +50,10 @@ bool Vector2::intersect(Vector2 other) const {
         return true;
 
     // Special cases
-    if (o1 == Point::OrientationType::COLLINEAR and Point::is_on_segment(begin_, other.begin_, end_) or
-        o2 == Point::OrientationType::COLLINEAR and Point::is_on_segment(begin_, other.end_, end_) or
-        o3 == Point::OrientationType::COLLINEAR and Point::is_on_segment(other.begin_, begin_, other.end_) or
-        o4 == Point::OrientationType::COLLINEAR and Point::is_on_segment(other.begin_, end_, other.end_))
+    if (o1 == Point::OrientationType::COLLINEAR and Point::is_on_segment(begin_, end_, other.begin_) or
+        o2 == Point::OrientationType::COLLINEAR and Point::is_on_segment(begin_, end_, other.end_) or
+        o3 == Point::OrientationType::COLLINEAR and Point::is_on_segment(other.begin_, other.end_, begin_) or
+        o4 == Point::OrientationType::COLLINEAR and Point::is_on_segment(other.begin_, other.end_, end_))
         return true;
 
     return false;
@@ -64,7 +64,7 @@ float Vector2::distance_to(Point p) const {
     // if its projection belongs to vector, then compute distance from projecion to point.
     // If not, then compute distance from nearest end of the vector to point
 
-    Vector2 ap {Point {0, 0}, p};
+    Vector2 ap {begin_, p};
 
     float projection = dot_product(ap) / dot_product(*this);
 
@@ -75,7 +75,7 @@ float Vector2::distance_to(Point p) const {
 
     // Compute distance via area of triangle
     Triangle apb {begin_, p, end_};
-    return apb.square() / length();
+    return 2 * apb.square() / length();
 }
 
 float Vector2::distance_to(Vector2 other) const {

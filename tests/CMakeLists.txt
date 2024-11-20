@@ -3,6 +3,8 @@ enable_testing()
 add_executable(
   test_geometry
   test_triangle.cpp
+  test_vector.cpp
+  test_polygon.cpp
 )
 
 target_link_libraries(

@@ -5,7 +5,7 @@
 
 class Point final {
 public:
-    explicit Point(float x, float y): x_(x), y_(y) {}
+    Point(float x, float y): x_(x), y_(y) {}
     explicit Point(float both): x_(both), y_(both) {}
 
     bool operator==(const Point &other) const = default;
