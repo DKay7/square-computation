@@ -5,6 +5,7 @@ add_executable(
   test_triangle.cpp
   test_vector.cpp
   test_polygon.cpp
+  test_point.cpp
 )
 
 target_link_libraries(
