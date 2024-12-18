@@ -3,6 +3,17 @@ project(SquareComputation)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+cmake_policy(SET CMP0074 NEW)
+
+find_package(OpenMP REQUIRED)
+if(NOT OpenMP_CXX_FOUND)
+	message(SEND_ERROR "Failed to find OpenMP.")
+	return()
+else()
+	include_directories(${OpenMP_INCLUDE_DIRS})
+    message("OpenMP FOUND dir is ${OpenMP_INCLUDE_DIRS}.")
+endif()
+set(CMAKE_CXX_FLAGS "-fopenmp")
 
 include(FetchContent)
 

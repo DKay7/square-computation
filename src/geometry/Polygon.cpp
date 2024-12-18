@@ -4,7 +4,10 @@
 #include "geometry/Triangle.h"
 #include "geometry/Vector2.h"
 
+#include <cstdlib>
 #include <initializer_list>
+#include <iostream>
+#include <omp.h>
 #include <stdexcept>
 #include <utility>
 
@@ -15,12 +18,13 @@ const std::vector<Point> &Polygon::get_points() const { return points_; }
 float Polygon::square() const {
     float sum = 0;
 
+#pragma omp parallel for
     for (int point_idx = 0; point_idx < points_.size(); ++point_idx) {
-        int next_point_idx = get_neighbour(point_idx, NeighbourDirection::COUNTER_CLOCKWISE).second;
-        sum += points_[point_idx].x_ * points_[next_point_idx].y_ - points_[next_point_idx].x_ * points_[point_idx].y_;
+        int next_point_idx = get_neighbour(point_idx, NeighbourDirection::CLOCKWISE).second;
+        sum += (points_[point_idx].x_ * points_[next_point_idx].y_ - points_[next_point_idx].x_ * points_[point_idx].y_);
     }
 
-    return sum / 2;
+    return std::abs(sum) / 2;
 }
 
 std::vector<Triangle> Polygon::triangulate() const {
@@ -62,7 +66,8 @@ std::vector<Triangle> Polygon::triangulate() const {
 }
 
 std::pair<Polygon, Polygon> Polygon::split(int a_idx, int b_idx) const {
-    if (!is_chord(a_idx, b_idx) or a_idx == b_idx)
+    if (a_idx == b_idx)  // FIXME: Fix is_chord function for outside lines
+                         /*if (!is_chord(a_idx, b_idx) or a_idx == b_idx)*/
         throw std::invalid_argument("Vector{a, b} must be a polygon chord to split it");
 
     std::vector<Point> part_a, part_b;
@@ -82,12 +87,15 @@ bool Polygon::is_chord(int a_idx, int b_idx) const {
     Vector2 potential_chord {points_[a_idx], points_[b_idx]};
 
     for (int vertex_idx = 0; vertex_idx < points_.size(); ++vertex_idx) {
-        int next_vertex_idx = (vertex_idx + 1) % points_.size();
+        int next_vertex_idx = get_neighbour(vertex_idx, NeighbourDirection::CLOCKWISE).second;
 
+        // Check if potential chord is a side of poly
         if ((a_idx == vertex_idx and b_idx == next_vertex_idx) or (a_idx == next_vertex_idx and b_idx == vertex_idx))
-            continue;
+            return false;
 
-        if (potential_chord.intersect({points_[vertex_idx], points_[next_vertex_idx]}))
+        // Check if potential chord intersects some side of poly, but not in the ends of this side
+        if (potential_chord.intersect({points_[vertex_idx], points_[next_vertex_idx]}) and
+            (a_idx != vertex_idx and a_idx != next_vertex_idx) and (b_idx != vertex_idx and b_idx != next_vertex_idx))
             return false;
     }
 
@@ -143,27 +151,27 @@ std::optional<std::pair<const Point &, int>> Polygon::find_intruding_vertex() co
     auto [counter_clockwice_neighbour, counter_clockwice_neighbour_idx] =
         get_neighbour(convex_vertex_idx, NeighbourDirection::COUNTER_CLOCKWISE);
 
-    Vector2              ca_edge(counter_clockwice_neighbour, clockwice_neighbour);
-    Triangle abc{counter_clockwice_neighbour, convex_vertex, clockwice_neighbour};
+    Vector2  ca_edge(counter_clockwice_neighbour, clockwice_neighbour);
+    Triangle abc {counter_clockwice_neighbour, convex_vertex, clockwice_neighbour};
 
     std::optional<std::pair<Point, int>> intrudind_candidate = std::nullopt;
-    float                max_distance        = -1;
+    float                                max_distance        = -1;
 
     // iterate throught whole polygon, but start from convex vertex clockwise neighbour
     for (int vertex_idx = clockwice_neighbour_idx; vertex_idx != convex_vertex_idx;
          vertex_idx     = get_neighbour(vertex_idx, NeighbourDirection::CLOCKWISE).second)
     {
         Point current_vertex = points_[vertex_idx];
-        
+
         // if another vertex is not inside our triangle, just skip it
-        if (!abc.is_point_inside(current_vertex)) 
+        if (!abc.is_point_inside(current_vertex))
             continue;
-        
+
         // check distance
         double distance_to_ca = ca_edge.distance_to(current_vertex);
         if (distance_to_ca > max_distance) {
             intrudind_candidate = {current_vertex, vertex_idx};
-            max_distance = distance_to_ca;
+            max_distance        = distance_to_ca;
         }
     }
 
